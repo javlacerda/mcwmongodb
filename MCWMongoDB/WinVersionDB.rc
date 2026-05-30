@@ -1,0 +1,28 @@
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     2026,04,25
+PRODUCTVERSION  2026,04,25
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_DLL
+FILESUBTYPE     VFT2_UNKNOWN
+
+BEGIN
+     BLOCK "StringFileInfo"
+     BEGIN
+         BLOCK "081604E4"
+         BEGIN
+             VALUE "CompanyName",     "Prozis.Tech, S. A.\0"
+             VALUE "FileDescription", "MongoDB\0"
+             VALUE "LegalCopyright",  "Copyright 2022 (c) Prozis.Tech, S. A.\0"
+             VALUE "ProductName",     "GM - Gestão Macwin\0"
+             VALUE "ProductVersion",  "2026.04.25\0"
+             VALUE "FileVersion",     "2026.04.25\0"
+             VALUE "InternalName",    "MCWMongoDB\0"
+         END
+     END
+     BLOCK "VarFileInfo"
+     BEGIN
+          VALUE "Translation", 0x816, 1252
+     END
+END

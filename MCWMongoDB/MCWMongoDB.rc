@@ -1,0 +1,47 @@
+STRINGTABLE DISCARDABLE 
+BEGIN
+1000 "MCWMongoDB"
+
+// Object descriptions
+2000 "MCWMongoDB:Object for interacting with a MongoDB NoSQL database."
+
+6000 "$setconnectionstring:$setconnectionstring(connectionstring) Sets the connection string."
+6001 "$setdatabase:$setdatabase(database) Sets the database name."
+6002 "$setcollection:$setcollection(collection) Sets collection name."
+6003 "$geterrormessage:$geterrormessage() Returns the error message from the last failed operation."
+6004 "$find:$find(documents) Retrieves documents from the collection that match the filters."
+6005 "$addfilter:$addfilter(fieldname,operator,value,type) Adds a filter to be used by the find function."
+6006 "$setdynamicfilter:$setdynamicfilter(dynamicfilter) Sets a dynamic filter to be used by the find function."
+6007 "$clearfilters:$clearfilters() Clear all filters."
+
+// Parameters description
+7000 "connectionstring:Connection string used to connect to MongoDB"
+7001 "database:Name of the database"
+7002 "collection:Name of the collection"
+7003 "documents:List of documents returned by MongoDB"
+7004 "fieldname:Name of the field used in the filter"
+7005 "operator:Comparison operator to apply"
+7006 "value:Value to filter by"
+7007 "type:Data type of the value"
+7008 "dynamicfilters:String containing additional filter in MongoDB query syntax"
+
+// Constants
+19999 "kMCWMongoDB" // Constans prefix
+
+20000 "OperatorEq:0:Equal"
+20001 "OperatorNe:1:Not equal"
+20002 "OperatorGt:2:Greater than"
+20003 "OperatorGte:3:Greater than or equal"
+20004 "OperatorLt:4:Lesser than"
+20005 "OperatorLte:5:Lesser than or equal"
+20006 "TypeChar:0:String"
+20007 "TypeInteger32:1:32-bit integer"
+20008 "TypeInteger64:2:64-bit integer"
+20009 "TypeFloat:3:Floating point"
+20010 "TypeBoolean:4:Boolean"
+20011 "TypeDateTime:5:Date and Time"
+20012 "TypeNull:6:Null"
+
+31000 "MCWMongoDBWndProc"
+END
+
