@@ -9,10 +9,10 @@
 const qshort LIB_RES_NAME = 1000;
 const qlong RES_CONST_PREFIX = 19999;
 const qlong RES_CONST_START = 20000;
-const qlong RES_CONST_END = 20012;
+const qlong RES_CONST_END = 20014;
 
 const qshort VERSION_MAJOR = 1;
-const qshort VERSION_MINOR = 0;
+const qshort VERSION_MINOR = 1;
 
 const qshort cObject_MongoDB = 1;
 
@@ -24,6 +24,7 @@ const qlong cFindFunction = 5;
 const qlong cAddFilterFunction = 6;
 const qlong cSetDynamicFilterFunction = 7;
 const qlong cClearFiltersFunction = 8;
+const qlong cAddInFilterFunction = 9;
 
 enum FilterOperators {
    foEQUAL = 0,
@@ -32,7 +33,9 @@ enum FilterOperators {
    foGREATER_OR_EQUAL = 3,
    foLESSER = 4,
    foLESSER_OR_EQUAL = 5,
-   foCOUNT = 6
+   foIN = 6,
+   foNOT_IN = 7,
+   foCOUNT = 8
 };
 
 enum DataTypes {
@@ -48,9 +51,22 @@ enum DataTypes {
 
 struct FilterItem {
    std::string fieldName;
-   std::string value;
+   std::string value; // used by scalar operators
+   std::vector<std::string> values; // used by foIN / foNOT_IN
    FilterOperators oper;
    DataTypes type;
+
+   FilterItem() = default;
+
+   // Scalar constructor (single value)
+   FilterItem(const std::string &fieldName, const std::string &value, FilterOperators oper, DataTypes type)
+      : fieldName(fieldName), value(value), oper(oper), type(type) {
+   }
+
+   // Multi-value constructor (for foIN / foNOT_IN)
+   FilterItem(const std::string &fieldName, const std::vector<std::string> &values, FilterOperators oper, DataTypes type)
+      : fieldName(fieldName), values(values), oper(oper), type(type) {
+   }
 };
 
 class CMongoDB
@@ -85,6 +101,7 @@ public:
    qbool find(EXTCompInfo *pEci);
    qbool setDynamicFilter(EXTCompInfo *pEci);
    qbool addFilter(EXTCompInfo *pEci);
+   qbool addInFilter(EXTCompInfo *pEci);
    qbool clearFilters(EXTCompInfo *pEci);
 
 private:
@@ -96,6 +113,7 @@ private:
    bool validateFind();
    bson_t *buildFilter();
    bool buildFilterItem(bson_t *dest, const std::string &fieldName, FilterOperators filterOperator, const std::string &value, DataTypes type);
+   bool buildInFilterItem(bson_t *dest, const std::string &fieldName, FilterOperators filterOperator, const std::vector<std::string> &values, DataTypes type);
    bool appendBsonValue(bson_t *doc, const std::string &key, const std::string &value, DataTypes type);
    bool iso8601ToMilliseconds(const std::string &iso, int64_t &retMs);
    void fillDestList(const bson_t *doc, EXTqlist *rowList);

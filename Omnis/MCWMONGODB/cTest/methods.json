@@ -21,6 +21,13 @@
 				"sublen": 0
 			},
 			{
+				"name": "lvLstValues",
+				"order": 4,
+				"type": "kList",
+				"subtype": "",
+				"sublen": 0
+			},
+			{
 				"name": "lvoMongoDB",
 				"order": 1,
 				"type": "kObject",

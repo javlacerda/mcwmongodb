@@ -13,6 +13,7 @@ BEGIN
 6005 "$addfilter:$addfilter(fieldname,operator,value,type) Adds a filter to be used by the find function."
 6006 "$setdynamicfilter:$setdynamicfilter(dynamicfilter) Sets a dynamic filter to be used by the find function."
 6007 "$clearfilters:$clearfilters() Clear all filters."
+6008 "$addinfilter:$addinfilter(fieldname,operator,values,type) Adds an In or NOT IN filter to be used by the find function."
 
 // Parameters description
 7000 "connectionstring:Connection string used to connect to MongoDB"
@@ -24,6 +25,7 @@ BEGIN
 7006 "value:Value to filter by"
 7007 "type:Data type of the value"
 7008 "dynamicfilters:String containing additional filter in MongoDB query syntax"
+7009 "values:List of values to filter by"
 
 // Constants
 19999 "kMCWMongoDB" // Constans prefix
@@ -34,6 +36,7 @@ BEGIN
 20003 "OperatorGte:3:Greater than or equal"
 20004 "OperatorLt:4:Lesser than"
 20005 "OperatorLte:5:Lesser than or equal"
+
 20006 "TypeChar:0:String"
 20007 "TypeInteger32:1:32-bit integer"
 20008 "TypeInteger64:2:64-bit integer"
@@ -41,6 +44,9 @@ BEGIN
 20010 "TypeBoolean:4:Boolean"
 20011 "TypeDateTime:5:Date and Time"
 20012 "TypeNull:6:Null"
+
+20013 "OperatorIn:6:In"
+20014 "OperatorNIn:7:Not in"
 
 31000 "MCWMongoDBWndProc"
 END
