@@ -2,10 +2,33 @@
 	"classtype": "kCode",
 	"omnisversion": "11.1",
 	"omnisbuild": 111037255,
-	"internalversion": 13,
+	"internalversion": 15,
 	"designtaskname": "Startup_Task",
 	"cvardefs": [
-
+		{
+			"name": "cvcCollection",
+			"order": 3,
+			"type": "kCharacter",
+			"subtype": "kSimplechar",
+			"sublen": 100000000,
+			"initval": "\"trans_logs\""
+		},
+		{
+			"name": "cvcConnectionString",
+			"order": 1,
+			"type": "kCharacter",
+			"subtype": "kSimplechar",
+			"sublen": 100000000,
+			"initval": "\"mongodb://THE_USER:THE_PASSWORD@MONGO_CONNECTION_STRING\""
+		},
+		{
+			"name": "cvcDatabase",
+			"order": 2,
+			"type": "kCharacter",
+			"subtype": "kSimplechar",
+			"sublen": 100000000,
+			"initval": "\"app_logs\""
+		}
 	],
 	"properties": {
 		"canremotedebugwhenlocked": false,
@@ -20,7 +43,7 @@
 		"editor": "",
 		"editordata": "",
 		"external": true,
-		"moddate": "2026-06-01 22:47:28",
+		"moddate": "2026-08-07 07:19:21",
 		"showascheckedout": false,
 		"userinfo": "",
 		"vcsrevision": 0,

@@ -1,3 +1,6 @@
+﻿// Prozis.Tech, S. A.
+// Utility functions
+
 #ifndef _UTILS_H_
 #define _UTILS_H_
 
@@ -21,11 +24,17 @@ bool getIntFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, int &valor, bool al
 bool getIntFromEXTfldval(EXTfldval &fldValue, int &destValue, bool allowNull = false);
 bool getIntFromEXTqlist(qlong rowno, qshort columnno, EXTqlist *list, int &destValue, bool allowNull = false);
 
+bool getInt64FromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, int64_t &valor, bool allowNull = false);
+
 bool getDoubleFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, double &valor, bool allowNull = false);
 bool getDoubleFromEXTfldval(EXTfldval &fldValue, double &valor, bool allowNull = false);
 
 bool getBoolFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, bool &destValue, bool allowNull = false);
 bool getBoolFromEXTfldval(EXTfldval &fldValue, int &destValue, bool allowNull);
+
+bool getEXTfldvalFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, EXTfldval &fldval);
+
+bool getParamType(EXTCompInfo *pEci, qlong paramID, ffttype &paramType, qshort *paramSubtype = nullptr);
 
 void stringToEXTfldval(const std::string &text, EXTfldval &result, const qshort uniType = preUniTypeAuto);
 void stringToEXTfldval(const std::wstring &text, EXTfldval &result);

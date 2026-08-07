@@ -1,6 +1,6 @@
 [
 	{
-		"name": "Test",
+		"name": "Test_Find_With_Filters",
 		"order": 1,
 		"pvardefs": [
 
@@ -21,8 +21,82 @@
 				"sublen": 0
 			},
 			{
-				"name": "lvLstValues",
+				"name": "lvoMongoDB",
+				"order": 1,
+				"type": "kObject",
+				"subtype": ".MCWMongoDB.MCWMongoDB",
+				"sublen": 0
+			}
+		]
+	},
+	{
+		"name": "Test_Find_With_Dynamic_Filters",
+		"order": 2,
+		"pvardefs": [
+
+		],
+		"lvardefs": [
+			{
+				"name": "lvbOk",
+				"order": 5,
+				"type": "kBoolean",
+				"subtype": 0,
+				"sublen": 0
+			},
+			{
+				"name": "lvcOpts",
+				"order": 3,
+				"type": "kCharacter",
+				"subtype": "kSimplechar",
+				"sublen": 100000000
+			},
+			{
+				"name": "lvcQuery",
+				"order": 2,
+				"type": "kCharacter",
+				"subtype": "kSimplechar",
+				"sublen": 100000000
+			},
+			{
+				"name": "lvLstRegs",
 				"order": 4,
+				"type": "kList",
+				"subtype": "",
+				"sublen": 0
+			},
+			{
+				"name": "lvoMongoDB",
+				"order": 1,
+				"type": "kObject",
+				"subtype": ".MCWMongoDB.MCWMongoDB",
+				"sublen": 0
+			}
+		]
+	},
+	{
+		"name": "Test_Aggregates",
+		"order": 3,
+		"pvardefs": [
+
+		],
+		"lvardefs": [
+			{
+				"name": "lvbOk",
+				"order": 4,
+				"type": "kBoolean",
+				"subtype": 0,
+				"sublen": 0
+			},
+			{
+				"name": "lvcAggregate",
+				"order": 2,
+				"type": "kCharacter",
+				"subtype": "kSimplechar",
+				"sublen": 100000000
+			},
+			{
+				"name": "lvLstRegs",
+				"order": 3,
 				"type": "kList",
 				"subtype": "",
 				"sublen": 0

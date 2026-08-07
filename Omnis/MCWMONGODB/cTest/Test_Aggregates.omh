@@ -1,0 +1,42 @@
+Do lvoMongoDB.$setconnectionstring(cvcConnectionString)
+Do lvoMongoDB.$setdatabase(cvcDatabase)
+Do lvoMongoDB.$setcollection(cvcCollection)
+
+Begin text block
+Line:[
+Line:  {
+Line:    "$match": {
+Line:      "table": "DocumentTbl",
+Line:      "fieldId": "DocumentID",
+Line:      "valueId": "INV/104383144"
+Line:    }
+Line:  },
+Line:  {
+Line:    "$unwind": "$details"
+Line:  },
+Line:  {
+Line:    "$match": {
+Line:      "details.fieldChanged": "DocumentStatus"
+Line:    }
+Line:  },
+Line:  {
+Line:    "$project": {
+Line:      "_id": 0,
+Line:      "createdOn": "$createdOn",
+Line:      "oldValue": "$details.oldValue",
+Line:      "newValue": "$details.newValue"
+Line:    }
+Line:  }
+Line:]
+End text block
+Get text block lvcAggregate
+
+Do lvoMongoDB.$setaggregate(lvcAggregate)
+
+Do lvoMongoDB.$aggregate(lvLstRegs) Returns lvbOk
+If not(lvbOk)
+	Do $ctask.$showmessage(lvoMongoDB.$geterrormessage())
+Else
+	Do $ctask.$showmessage(con(lvLstRegs.$linecount," documents returned."))
+End If
+Quit method

@@ -14,6 +14,10 @@ BEGIN
 6006 "$setdynamicfilter:$setdynamicfilter(dynamicfilter) Sets a dynamic filter to be used by the find function."
 6007 "$clearfilters:$clearfilters() Clear all filters."
 6008 "$addinfilter:$addinfilter(fieldname,operator,values,type) Adds an In or NOT IN filter to be used by the find function."
+6009 "$setopts:$setopts(opts) Sets additional options (raw JSON, e.g. sort, limit, projection) to be used by the find function."
+6010 "$setaggregate:$setaggregate(pipeline) Sets the aggregation pipeline (JSON array of stages) to be used by the aggregate function."
+6011 "$aggregate:$aggregate(documents) Executes the aggregation pipeline and retrieves the resulting documents."
+6012 "$clearaggregate:$clearaggregate() Clears the aggregation pipeline."
 
 // Parameters description
 7000 "connectionstring:Connection string used to connect to MongoDB"
@@ -26,6 +30,8 @@ BEGIN
 7007 "type:Data type of the value"
 7008 "dynamicfilters:String containing additional filter in MongoDB query syntax"
 7009 "values:List of values to filter by"
+7010 "opts:String containing additional find options in MongoDB query syntax (sort, limit, projection, etc.)"
+7011 "pipeline:String containing the aggregation pipeline stages, as a MongoDB JSON array of stage documents"
 
 // Constants
 19999 "kMCWMongoDB" // Constans prefix

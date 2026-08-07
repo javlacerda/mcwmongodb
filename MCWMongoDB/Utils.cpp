@@ -1,22 +1,21 @@
-/*
-** Utility functions
-*/
+// Prozis.Tech, S. A.
+// Utility functions
 
 #include "Utils.h"
 #include <memory>
 
-/*
-** Gets a std::wstring from an EXTCompInfo structure
-*/
+// Gets a std::wstring from an EXTCompInfo structure
 bool getStringFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, std::wstring &destValue, bool allowNull)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
-   if (!param)
+   if (!param) {
       return false;
+   }
 
    EXTfldval paramVal(reinterpret_cast<qfldval>(param->mData));
-   if (paramVal.isNull())
+   if (paramVal.isNull()) {
       return allowNull;
+   }
 
    std::unique_ptr<qchar[]> textTmp(new qchar[paramVal.getCharLen() + sizeof(qchar)]);
    qlong lenTransf;
@@ -29,33 +28,56 @@ bool getStringFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, std::wstring &de
    return true;
 }
 
-/*
-** Gets a std::string from an EXTCompInfo structure
-*/
+// Gets a std::string from an EXTCompInfo structure, allowing for numeric values to be converted to strings
+// TODO: ADD SUPPORT FOR DATE AND TIME FIELDS
 bool getStringFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, std::string &destValue, bool allowNull)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
-   if (param == nullptr)
+   if (param == nullptr) {
       return false;
+   }
 
    EXTfldval paramVal(reinterpret_cast<qfldval>(param->mData));
-   if (paramVal.isNull())
+   if (paramVal.isNull()) {
       return allowNull;
+   }
 
-   std::unique_ptr<qchar[]> textTmp(new qchar[paramVal.getCharLen() + sizeof(qchar)]);
-   qlong lenTransf;
+   ffttype type;
+   qshort subtype;
+   paramVal.getType(type, &subtype);
 
-   paramVal.getChar(paramVal.getCharLen(), textTmp.get(), lenTransf);
-   textTmp[paramVal.getCharLen()] = 0;
+   if (type == fftCharacter) {
+      std::unique_ptr<qchar[]> textTmp(new qchar[paramVal.getCharLen() + sizeof(qchar)]);
+      qlong lenTransf;
 
-   CHRconvToBytes converter(textTmp.get());
-   destValue = reinterpret_cast<char *>(converter.dataPtr());
+      paramVal.getChar(paramVal.getCharLen(), textTmp.get(), lenTransf);
+      textTmp[paramVal.getCharLen()] = 0;
+
+      CHRconvToBytes converter(textTmp.get());
+      destValue.assign(reinterpret_cast<const char *>(converter.dataPtr()), converter.len());
+   }
+   else if (type == fftInteger) {
+      if (subtype == dpF64bitinteger) {
+         destValue = std::to_string(paramVal.getLong64());
+      }
+      else {
+         destValue = std::to_string(paramVal.getLong());
+      }
+   }
+   else if (type == fftNumber) {
+      qreal numValue;
+      qshort numDP = dpDefault;
+      paramVal.getNum(numValue, numDP);
+      destValue = std::to_string(numValue);
+   }
+   else {
+      return false;
+   }
+
    return true;
 }
 
-/*
-** Gets a str255 from an EXTCompInfo structure
-*/
+// Gets a str255 from an EXTCompInfo structure
 bool getStringFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, str255 &destValue, bool allowNull)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -70,9 +92,7 @@ bool getStringFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, str255 &destValu
    return true;
 }
 
-/*
-** Gets a std::vector<qchar> from an EXTCompInfo structure
-*/
+// Gets a std::vector<qchar> from an EXTCompInfo structure
 bool getStringFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, std::vector<qchar> &destValue, bool allowNull)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -91,28 +111,26 @@ bool getStringFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, std::vector<qcha
    return true;
 }
 
-/*
-** Gets a EXTqlist class from an EXTCompInfo structure
-*/
+// Gets a EXTqlist class from an EXTCompInfo structure
 EXTqlist *getListFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, bool duplicate)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
-   if (!param)
+   if (!param) {
       return nullptr;
+   }
 
    EXTfldval fval(reinterpret_cast<qfldval>(param->mData));
 
    ffttype fvalType;
    fval.getType(fvalType);
-   if (fvalType != fftList)
+   if (fvalType != fftList) {
       return nullptr;
+   }
 
    return fval.getList(duplicate ? qtrue : qfalse);
 }
 
-/*
-** Gets a EXTqlist class from an EXTCompInfo structure.
-*/
+// Gets a EXTqlist class from an EXTCompInfo structure.
 EXTqlist *getListFromEXTqlist(qlong rowno, qshort columnno, EXTqlist *list, bool duplicate)
 {
    EXTfldval fldValue;
@@ -129,9 +147,7 @@ EXTqlist *getListFromEXTqlist(qlong rowno, qshort columnno, EXTqlist *list, bool
    return fldValue.getList(duplicate ? qtrue : qfalse);
 }
 
-/*
-** Gets a std::string from an EXTqlist row/col
-*/
+// Gets a std::string from an EXTqlist row/col
 bool getStringFromEXTqlist(qlong rowno, qshort columnno, EXTqlist *list, std::string &destValue)
 {
    EXTfldval fldValue;
@@ -139,9 +155,7 @@ bool getStringFromEXTqlist(qlong rowno, qshort columnno, EXTqlist *list, std::st
    return getStringFromEXTfldval(fldValue, destValue);
 }
 
-/*
-** Gets a std::string from an EXTfldval structure
-*/
+// Gets a std::string from an EXTfldval structure
 bool getStringFromEXTfldval(EXTfldval &fval, std::string &destValue)
 {
    qlong charLen = fval.getCharLen();
@@ -157,9 +171,7 @@ bool getStringFromEXTfldval(EXTfldval &fval, std::string &destValue)
    return true;
 }
 
-/*
-** Gets a std::string from an EXTqlist row/col
-*/
+// Gets a std::string from an EXTqlist row/col
 bool getStringFromEXTqlist(qlong rowno, qshort columnno, EXTqlist &list, std::string &destValue)
 {
    EXTfldval fldValue;
@@ -167,9 +179,39 @@ bool getStringFromEXTqlist(qlong rowno, qshort columnno, EXTqlist &list, std::st
    return getStringFromEXTfldval(fldValue, destValue);
 }
 
-/*
-** Sets a std::string to an EXTfldval structure
-*/
+// Gets an EXTfldval object from an EXTCompInfo object
+bool getEXTfldvalFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, EXTfldval &fldval)
+{
+   EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
+   if (!param) {
+      return false;
+   }
+
+   fldval.setFldVal(reinterpret_cast<qfldval>(param->mData));
+   return true;
+}
+
+// Gets the param dataType from an EXTCompInfo object
+bool getParamType(EXTCompInfo *pEci, qlong paramID, ffttype &paramType, qshort *paramSubtype)
+{
+   EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
+   if (!param) {
+      return false;
+   }
+
+   EXTfldval fval(reinterpret_cast<qfldval>(param->mData));
+
+   qshort fvalSubtype;
+   fval.getType(paramType, &fvalSubtype);
+
+   if (paramSubtype) {
+      *paramSubtype = fvalSubtype;
+   }
+
+   return true;
+}
+
+// Sets a std::string to an EXTfldval structure
 void stringToEXTfldval(const std::string &text, EXTfldval &result, const qshort uniType)
 {
    if (uniType == preUniTypeAuto) {
@@ -182,18 +224,14 @@ void stringToEXTfldval(const std::string &text, EXTfldval &result, const qshort 
    }
 }
 
-/*
-** Sets a std::wstring to an EXTfldval structure
-*/
+// Sets a std::wstring to an EXTfldval structure
 void stringToEXTfldval(const std::wstring &text, EXTfldval &result)
 {
    CHRconvFromOs cConv(reinterpret_cast<qoschar *>(const_cast<wchar_t *>(text.c_str())));
    result.setChar(cConv.dataPtr(), cConv.len());
 }
 
-/*
-** Sets a std::string to an EXTqlist structure
-*/
+// Sets a std::string to an EXTqlist structure
 void stringToEXTqlist(qlong rowno, qshort columnno, const std::string &value, EXTqlist *destList, const qshort uniType)
 {
    EXTfldval fldvalCol;
@@ -209,9 +247,7 @@ void stringToEXTqlist(qlong rowno, qshort columnno, const std::string &value, EX
    }
 }
 
-/*
-** Sets a std::wstring to an EXTqlist structure
-*/
+// Sets a std::wstring to an EXTqlist structure
 void stringToEXTqlist(qlong rowno, qshort columnno, const std::wstring &value, EXTqlist *destList)
 {
    EXTfldval fldvalCol;
@@ -219,9 +255,7 @@ void stringToEXTqlist(qlong rowno, qshort columnno, const std::wstring &value, E
    stringToEXTfldval(value, fldvalCol);
 }
 
-/*
-** Sets a std::wstring to an EXTCompInfo structure
-*/
+// Sets a std::wstring to an EXTCompInfo structure
 bool stringToEXTCompInfo(const std::wstring &orig, EXTCompInfo *pEci, const qshort paramID)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -237,9 +271,7 @@ bool stringToEXTCompInfo(const std::wstring &orig, EXTCompInfo *pEci, const qsho
    return true;
 }
 
-/*
-** Sets a EXTqlist to an EXTqlist structure
-*/
+// Sets a EXTqlist to an EXTqlist structure
 void listToEXTqlist(qlong rowno, qshort columnno, EXTqlist *value, EXTqlist *destList, bool transferOwnership)
 {
    EXTfldval fldvalCol;
@@ -247,9 +279,7 @@ void listToEXTqlist(qlong rowno, qshort columnno, EXTqlist *value, EXTqlist *des
    fldvalCol.setList(value, transferOwnership ? qtrue : qfalse);
 }
 
-/*
-** Gets an integer from an EXTCompInfo structure
-*/
+// Gets an integer from an EXTCompInfo structure
 bool getIntFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, int &destValue, bool allowNull)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -257,16 +287,15 @@ bool getIntFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, int &destValue, boo
       return false;
 
    EXTfldval paramValue(reinterpret_cast<qfldval>(param->mData));
-   if (paramValue.isNull() && !allowNull)
-      return false;
+   if (paramValue.isNull()) {
+      return allowNull;
+   }
 
    destValue = static_cast<int>(paramValue.getLong());
    return true;
 }
 
-/*
-** Gets an integer from an EXTfldval structure
-*/
+// Gets an integer from an EXTfldval structure
 bool getIntFromEXTfldval(EXTfldval &fldValue, int &destValue, bool allowNull)
 {
    if (fldValue.isNull())
@@ -276,9 +305,7 @@ bool getIntFromEXTfldval(EXTfldval &fldValue, int &destValue, bool allowNull)
    return true;
 }
 
-/*
-** Gets an integer from an EXTqlist row/col
-*/
+// Gets an integer from an EXTqlist row/col
 bool getIntFromEXTqlist(qlong rowno, qshort columnno, EXTqlist *list, int &destValue, bool allowNull)
 {
    EXTfldval fldValue;
@@ -286,9 +313,22 @@ bool getIntFromEXTqlist(qlong rowno, qshort columnno, EXTqlist *list, int &destV
    return getIntFromEXTfldval(fldValue, destValue, allowNull);
 }
 
-/*
-** Gets a boolean from an EXTCompInfo
-*/
+// Gets an integer 64bits from an EXTCompInfo structure
+bool getInt64FromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, int64_t &destValue, bool allowNull)
+{
+   EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
+   if (!param)
+      return false;
+
+   EXTfldval paramValue(reinterpret_cast<qfldval>(param->mData));
+   if (paramValue.isNull())
+      return allowNull;
+
+   destValue = static_cast<int>(paramValue.getLong64());
+   return true;
+}
+
+// Gets a boolean from an EXTCompInfo
 bool getBoolFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, bool &destValue, bool allowNull)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -303,9 +343,7 @@ bool getBoolFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, bool &destValue, b
    return true;
 }
 
-/*
-** Gets a boolean from an EXTfldval structure
-*/
+// Gets a boolean from an EXTfldval structure
 bool getBoolFromEXTfldval(EXTfldval &fldValue, int &destValue, bool allowNull)
 {
    if (fldValue.isNull())
@@ -315,9 +353,7 @@ bool getBoolFromEXTfldval(EXTfldval &fldValue, int &destValue, bool allowNull)
    return true;
 }
 
-/*
-** Ler um parâmetro do tipo double a partir de uma estrutura EXTCompInfo
-*/
+// Ler um parâmetro do tipo double a partir de uma estrutura EXTCompInfo
 bool getDoubleFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, double &valor, bool allowNull)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -333,9 +369,7 @@ bool getDoubleFromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, double &valor, b
    return true;
 }
 
-/*
-** Ler um parâmetro do tipo double a partir de uma estrutura EXTCompInfo
-*/
+// Ler um parâmetro do tipo double a partir de uma estrutura EXTCompInfo
 bool getDoubleFromEXTfldval(EXTfldval &fldValue, double &valor, bool allowNull)
 {
    if (fldValue.isNull())
@@ -346,9 +380,7 @@ bool getDoubleFromEXTfldval(EXTfldval &fldValue, double &valor, bool allowNull)
    return true;
 }
 
-/*
-** Copiar uma variável do tipo boolean para a estrutura EXTCompInfo
-*/
+// Copiar uma variável do tipo boolean para a estrutura EXTCompInfo
 bool boolToEXTCompInfo(const bool valor, EXTCompInfo *pEci, const qshort paramID)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -361,25 +393,19 @@ bool boolToEXTCompInfo(const bool valor, EXTCompInfo *pEci, const qshort paramID
    return qtrue;
 }
 
-/*
-** Sets a bool value to an EXTfldval structure
-*/
+// Sets a bool value to an EXTfldval structure
 void boolToEXTfldval(const bool value, EXTfldval &result)
 {
    result.setBool(value ? preBoolTrue : preBoolFalse);
 }
 
-/*
-** Sets a qbool value to an EXTfldval structure
-*/
+// Sets a qbool value to an EXTfldval structure
 void boolToEXTfldval(const qbool value, EXTfldval &result)
 {
    result.setBool((value == qtrue) ? preBoolTrue : preBoolFalse);
 }
 
-/*
-** Sets a bool value to an EXTqlist row/col
-*/
+// Sets a bool value to an EXTqlist row/col
 void boolToEXTqlist(qlong rowno, qshort columnno, const bool value, EXTqlist &list)
 {
    EXTfldval fldvalCol;
@@ -394,17 +420,13 @@ void boolToEXTqlist(qlong rowno, qshort columnno, const bool value, EXTqlist *de
    fldvalCol.setBool(value ? preBoolTrue : preBoolFalse);
 }
 
-/*
-** Sets an int value to an EXTfldval structure
-*/
+// Sets an int value to an EXTfldval structure
 void intToEXTfldval(const int32_t value, EXTfldval &result)
 {
    result.setLong(value);
 }
 
-/*
-** Sets an int value to an EXTqlist row/col
-*/
+// Sets an int value to an EXTqlist row/col
 void intToEXTqlist(qlong rowno, qshort columnno, const int32_t value, EXTqlist &list)
 {
    EXTfldval fldvalCol;
@@ -412,6 +434,7 @@ void intToEXTqlist(qlong rowno, qshort columnno, const int32_t value, EXTqlist &
    fldvalCol.setLong(value);
 }
 
+// Sets abd int value to an EXTqlist object
 void intToEXTqlist(qlong rowno, qshort columnno, const int32_t value, EXTqlist *destList)
 {
    EXTfldval fldvalCol;
@@ -419,9 +442,7 @@ void intToEXTqlist(qlong rowno, qshort columnno, const int32_t value, EXTqlist *
    fldvalCol.setLong(value);
 }
 
-/*
-** Sets an int value to an EXTfldval structure
-*/
+// Sets an int value to an EXTfldval structure
 bool intToEXTCompInfo(const int32_t valor, EXTCompInfo *pEci, const qshort paramID)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -434,17 +455,13 @@ bool intToEXTCompInfo(const int32_t valor, EXTCompInfo *pEci, const qshort param
    return true;
 }
 
-/*
-** Sets an int64_t value to an EXTfldval
-*/
+// Sets an int64_t value to an EXTfldval
 void longToEXTfldval(const int64_t value, EXTfldval &result)
 {
    result.setLong64(value);
 }
 
-/*
-** Sets an int64_t value to an EXTqlist row/col
-*/
+// Sets an int64_t value to an EXTqlist row/col
 void longToEXTqlist(qlong rowno, qshort columnno, const int64_t value, EXTqlist &list)
 {
    EXTfldval fldvalCol;
@@ -452,9 +469,7 @@ void longToEXTqlist(qlong rowno, qshort columnno, const int64_t value, EXTqlist 
    fldvalCol.setLong64(value);
 }
 
-/*
-** Sets an int64_t value to an EXTqlist row/col
-*/
+// Sets an int64_t value to an EXTqlist row/col
 void longToEXTqlist(qlong rowno, qshort columnno, const int64_t value, EXTqlist *destList)
 {
    EXTfldval fldvalCol;
@@ -462,9 +477,7 @@ void longToEXTqlist(qlong rowno, qshort columnno, const int64_t value, EXTqlist 
    fldvalCol.setLong64(value);
 }
 
-/*
-** Sets a double value to an EXTqlist row/col
-*/
+// Sets a double value to an EXTqlist row/col
 void doubleToEXTqlist(qlong rowno, qshort columnno, const double value, EXTqlist *destList)
 {
    EXTfldval fldvalCol;
@@ -472,9 +485,7 @@ void doubleToEXTqlist(qlong rowno, qshort columnno, const double value, EXTqlist
    fldvalCol.setNum(value);
 }
 
-/*
-** Sets a null value to an EXTqlist row/col
-*/
+// Sets a null value to an EXTqlist row/col
 void nullToEXTqlist(qlong rowno, qshort columnno, EXTqlist *destList)
 {
    EXTfldval fldvalCol;
@@ -482,9 +493,7 @@ void nullToEXTqlist(qlong rowno, qshort columnno, EXTqlist *destList)
    fldvalCol.setNull();
 }
 
-/*
-** Sets a DateTime value to an EXTqlist row/col
-*/
+// Sets a DateTime value to an EXTqlist row/col
 void dateTimeToEXTqlist(qlong rowno, qshort columnno, const std::chrono::milliseconds value, EXTqlist *destList)
 {
    std::chrono::system_clock::time_point tp{ value };
@@ -514,9 +523,7 @@ void dateTimeToEXTqlist(qlong rowno, qshort columnno, const std::chrono::millise
    fldvalCol.setDate(omnisDateTime);
 }
 
-/*
-** Sets a long value to an EXTfldval structure
-*/
+// Sets a long value to an EXTfldval structure
 bool longToEXTCompInfo(const int64_t valor, EXTCompInfo *pEci, const qshort paramID)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -529,9 +536,7 @@ bool longToEXTCompInfo(const int64_t valor, EXTCompInfo *pEci, const qshort para
    return true;
 }
 
-/*
-** Sets a double value to an EXTfldval structure
-*/
+// Sets a double value to an EXTfldval structure
 bool doubleToEXTCompInfo(const double valor, EXTCompInfo *pEci, const qshort paramID)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -544,9 +549,7 @@ bool doubleToEXTCompInfo(const double valor, EXTCompInfo *pEci, const qshort par
    return true;
 }
 
-/*
-** Converts a char array to a std::wstring
-*/
+// Converts a char array to a std::wstring
 bool charToWstring(const char *source, std::wstring &destination)
 {
    size_t sourceSize = strlen(source);
@@ -561,17 +564,13 @@ bool charToWstring(const char *source, std::wstring &destination)
    return rc != -1;
 }
 
-/*
-** Converts a std::string to a std::wstring
-*/
+// Converts a std::string to a std::wstring
 bool stringToWstring(const std::string &source, std::wstring &destination)
 {
    return charToWstring(source.c_str(), destination);
 }
 
-/*
-** Sets a binary to a EXTCompInfo class
-*/
+// Sets a binary to a EXTCompInfo class
 bool binaryToEXTCompInfo(EXTCompInfo *pEci, const qshort paramID, unsigned char *value, int size)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -585,9 +584,7 @@ bool binaryToEXTCompInfo(EXTCompInfo *pEci, const qshort paramID, unsigned char 
    return true;
 }
 
-/*
-** Sets a binary to a EXTCompInfo class
-* */
+// Sets a binary to a EXTCompInfo class
 bool binaryToEXTCompInfo(EXTCompInfo *pEci, const qshort paramID, char *value, int size)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);
@@ -601,86 +598,69 @@ bool binaryToEXTCompInfo(EXTCompInfo *pEci, const qshort paramID, char *value, i
    return true;
 }
 
-/*
-** Adds a fftCharacter/dpFcharacter column to an EXTqlist object
-*/
+// Adds a fftCharacter/dpFcharacter column to an EXTqlist object
 qshort addCharacterColToEXTqlist(EXTqlist *destList, const qlong fln, const char *name)
 {
    str255 colName(name);
    return destList->addCol(fftCharacter, dpFcharacter, fln, &colName);
 }
 
-/*
-** Adds an fftInteger column no an EXTqlist object
-*/
+// Adds an fftInteger column no an EXTqlist object
 qshort addIntegerColToEXTqlist(EXTqlist *destList, const char *name)
 {
    str255 colName(name);
    return destList->addCol(fftInteger, 0, 0, &colName);
 }
 
-/*
-** Adds an fftInteger/dpF64bitinteger column no an EXTqlist object
-*/
+// Adds an fftInteger/dpF64bitinteger column no an EXTqlist object
 qshort addInteger64ColToEXTqlist(EXTqlist *destList, const char *name)
 {
    str255 colName(name);
    return destList->addCol(fftInteger, dpF64bitinteger, 0, &colName);
 }
 
-/*
-** Adds an fftInteger/dpF64bitinteger column no an EXTqlist object
-*/
+// Adds an fftInteger/dpF64bitinteger column no an EXTqlist object
 qshort addDoubleColToEXTqlist(EXTqlist *destList, const char *name)
 {
    str255 colName(name);
    return destList->addCol(fftNumber, dpFloat, 0, &colName);
 }
 
-/*
-** Adds an fftBoolean column no an EXTqlist object
-*/
+// Adds an fftBoolean column no an EXTqlist object
 qshort addBoolColToEXTqlist(EXTqlist *destList, const char *name)
 {
    str255 colName(name);
    return destList->addCol(fftBoolean, 0, 0, &colName);
 }
 
-/*
-** Adds an EXTqlist column no an EXTqlist object
-*/
+// Adds an EXTqlist column no an EXTqlist object
 qshort addEXTqlistColToEXTqlist(EXTqlist *destList, const char *name)
 {
    str255 colName(name);
    return destList->addCol(fftList, 0, 0, &colName);
 }
 
-/*
-** Adds a Row column no an EXTqlist object
-*/
+// Adds a Row column no an EXTqlist object
 qshort addRowColToEXTqlist(EXTqlist *destList, const char *name)
 {
    str255 colName(name);
    return destList->addCol(fftList, dpFrow, 0, &colName);
 }
 
-/*
-** Adds a Datetime column no an EXTqlist object
-*/
+// Adds a Datetime column no an EXTqlist object
 qshort addDateTimeColToEXTqlist(EXTqlist *destList, const char *name)
 {
    str255 colName(name);
    return destList->addCol(fftDate, dpFdtimeC, 0, &colName);
 }
 
-/*
-** Converts an array of chars to str255 object
-*/
+// Converts an array of chars to str255 object
 void charToStr255(const char *text, str255 &omnisString)
 {
    omnisString.setUtf8(reinterpret_cast<qbyte *>(const_cast<char *>(text)), static_cast<qlong>(strlen(text)));
 }
 
+// Converts a char array to a str255 object
 str255 charToStr255(const char *text)
 {
    CHRconvFromBytes cConv(reinterpret_cast<qbyte *>(const_cast<char *>(text)));
@@ -688,9 +668,7 @@ str255 charToStr255(const char *text)
    return omnisString;
 }
 
-/*
-** Replaces Omnis New LIne chars with cpp standard new line
-*/
+// Replaces Omnis New Line chars with cpp standard new line
 void replaceOmnisNewLine(std::wstring &text)
 {
    if (text.empty())
@@ -706,9 +684,7 @@ void replaceOmnisNewLine(std::wstring &text)
    }
 }
 
-/*
-** Send information to Omnis trace log
-*/
+// Send information to Omnis trace log
 void sendToOmnisTraceLog(const char *msg)
 {
    CHRconvFromBytes conv(reinterpret_cast<qbyte *>(const_cast<char *>(msg)));
@@ -716,6 +692,7 @@ void sendToOmnisTraceLog(const char *msg)
    ECOaddTraceLine(&msgStr);
 }
 
+// Send information to Omnis trace log
 void sendToOmnisTraceLog(const char *msg1, const char *msg2)
 {
    CHRconvFromBytes conv1(reinterpret_cast<qbyte *>(const_cast<char *>(msg1)));
@@ -727,6 +704,7 @@ void sendToOmnisTraceLog(const char *msg1, const char *msg2)
    ECOaddTraceLine(&msgStr1, &msgStr2);
 }
 
+// Send information to Omnis trace log
 void sendToOmnisTraceLog(const char *msg1, const str255 &msg2)
 {
    CHRconvFromBytes conv1(reinterpret_cast<qbyte *>(const_cast<char *>(msg1)));
@@ -734,6 +712,7 @@ void sendToOmnisTraceLog(const char *msg1, const str255 &msg2)
    ECOaddTraceLine(&msgStr1, const_cast<str255 *>(&msg2));
 }
 
+// Send information to Omnis trace log
 void sendToOmnisTraceLog(const char *msg1, const wchar_t *msg2)
 {
    CHRconvFromBytes conv1(reinterpret_cast<qbyte *>(const_cast<char *>(msg1)));
@@ -742,9 +721,7 @@ void sendToOmnisTraceLog(const char *msg1, const wchar_t *msg2)
    ECOaddTraceLine(&msgStr1, &msgStr2);
 }
 
-/*
-** Checks if one param exists
-*/
+// Checks if one param exists
 bool checkParamExists(EXTCompInfo *pEci, qlong paramID)
 {
    EXTParamInfo *param = ECOfindParamNum(pEci, paramID);

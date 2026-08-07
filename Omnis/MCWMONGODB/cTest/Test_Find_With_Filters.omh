@@ -1,0 +1,16 @@
+Do lvoMongoDB.$setconnectionstring(cvcConnectionString)
+Do lvoMongoDB.$setdatabase(cvcDatabase)
+Do lvoMongoDB.$setcollection(cvcCollection)
+
+Do lvoMongoDB.$addfilter("table",kMCWMongoDBOperatorEq,"DocumentTbl",kMCWMongoDBTypeChar)
+Do lvoMongoDB.$addfilter("fieldId",kMCWMongoDBOperatorEq,"DocumentID",kMCWMongoDBTypeChar)
+Do lvoMongoDB.$addfilter("valueId",kMCWMongoDBOperatorEq,"INV/104383144",kMCWMongoDBTypeChar)
+Do lvoMongoDB.$addfilter("details.fieldChanged",kMCWMongoDBOperatorEq,"DocumentStatus",kMCWMongoDBTypeChar)
+
+Do lvoMongoDB.$find(lvLstRegs) Returns lvbOk
+If not(lvbOk)
+	Do $ctask.$showmessage(lvoMongoDB.$geterrormessage())
+Else
+	Do $ctask.$showmessage(con(lvLstRegs.$linecount," documents returned."))
+End If
+Quit method

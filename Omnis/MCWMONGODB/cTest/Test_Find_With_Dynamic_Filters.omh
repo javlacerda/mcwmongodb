@@ -1,0 +1,35 @@
+Do lvoMongoDB.$setconnectionstring(cvcConnectionString)
+Do lvoMongoDB.$setdatabase(cvcDatabase)
+Do lvoMongoDB.$setcollection(cvcCollection)
+
+Begin text block
+Line:{
+Line:   "table": "DocumentTbl",
+Line:   "fieldId": "DocumentID",
+Line:   "valueId": "INV/104383144",
+Line:   "details.fieldChanged": "DocumentStatus"
+Line:}
+End text block
+Get text block lvcQuery
+
+Do lvoMongoDB.$setdynamicfilter(lvcQuery)
+
+Begin text block
+Line:{
+Line:   "projection": {
+Line:      "_id": 0,
+Line:      "details": 1
+Line:   }
+Line:}
+End text block
+Get text block lvcOpts
+
+Do lvoMongoDB.$setopts(lvcOpts)
+
+Do lvoMongoDB.$find(lvLstRegs) Returns lvbOk
+If not(lvbOk)
+	Do $ctask.$showmessage(lvoMongoDB.$geterrormessage())
+Else
+	Do $ctask.$showmessage(con(lvLstRegs.$linecount," documents returned."))
+End If
+Quit method
