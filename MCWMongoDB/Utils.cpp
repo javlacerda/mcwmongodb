@@ -324,7 +324,7 @@ bool getInt64FromEXTCompInfo(EXTCompInfo *pEci, qlong paramID, int64_t &destValu
    if (paramValue.isNull())
       return allowNull;
 
-   destValue = static_cast<int>(paramValue.getLong64());
+   destValue = paramValue.getLong64();
    return true;
 }
 

@@ -2,13 +2,14 @@
 // DLL Entry point
 
 #include "MCWMongoDB.h"
-#include "../Utils.h"
+#include "Utils.h"
 #include <map>
+#include <vector>
 #include <cstring>
-#include <cstdio>
 #include <ctime>
-#include <stdexcept>
 #include <sstream>
+#include <system_error>
+#include <thread>
 
 // List of objects provided by the xcomp
 ECOobject oMongoDBObjects[] =
@@ -37,25 +38,9 @@ ECOparam paramsFind[] =
     {7003, fftList, 0, 0}
 };
 
-ECOparam paramsAddFilter[] =
-{
-    {7004, fftCharacter, 0, 0},
-    {7005, fftInteger, 0, 0},
-    {7006, fftInteger, 0, 0},
-    {7007, fftInteger, 0, 0}
-};
-
-ECOparam paramsSetDynamicFilter[] =
+ECOparam paramsSetFilter[] =
 {
     {7008, fftCharacter, 0, 0}
-};
-
-ECOparam paramsAddInFilter[] =
-{
-    {7008, fftCharacter, 0, 0},
-    {7005, fftInteger,   0, 0},
-    {7009, fftInteger,   0, 0},
-    {7007, fftList,      0, 0}
 };
 
 ECOparam paramsSetOpts[] =
@@ -76,14 +61,10 @@ ECOmethodEvent oMongoDBFunctions[] =
     {cSetCollectionFunction,        6002, fftBoolean,   std::size(paramsSetCollection),       paramsSetCollection,       0, 0},
     {cGetErrorMessageFunction,      6003, fftCharacter, 0, 0, 0, 0},
     {cFindFunction,                 6004, fftBoolean,   std::size(paramsFind),                paramsFind,                0, 0},
-    {cAddFilterFunction,            6005, fftBoolean,   std::size(paramsAddFilter),           paramsAddFilter,           0, 0},
-    {cSetDynamicFilterFunction,     6006, fftBoolean,   std::size(paramsSetDynamicFilter),    paramsSetDynamicFilter,    0, 0},
-    {cClearFiltersFunction,         6007, fftBoolean,   0, 0, 0, 0},
-    {cAddInFilterFunction,          6008, fftBoolean,   std::size(paramsAddInFilter),         paramsAddInFilter,         0, 0 },
+    {cSetFilterFunction,            6006, fftBoolean,   std::size(paramsSetFilter),           paramsSetFilter,           0, 0},
     {cSetOptsFunction,              6009, fftBoolean,   std::size(paramsSetOpts),             paramsSetOpts,             0, 0 },
     {cSetAggregateFunction,         6010, fftBoolean,   std::size(paramsSetAggregate),        paramsSetAggregate,        0, 0 },
-    {cAggregateFunction,            6011, fftBoolean,   std::size(paramsFind),                paramsFind,                0, 0 },
-    {cClearAggregateFunction,       6012, fftBoolean,   0, 0, 0, 0 }
+    {cAggregateFunction,            6011, fftBoolean,   std::size(paramsFind),                paramsFind,                0, 0 }
 };
 
 const qshort cFunctionsCount = static_cast<qshort>(std::size(oMongoDBFunctions));
@@ -193,9 +174,7 @@ extern "C" LRESULT OMNISWNDPROC MCWMongoDBWndProc(HWND hwnd, UINT Msg, WPARAM wP
 // Constructor
 CMongoDB::CMongoDB(qobjinst pObjPtr)
    : m_ObjPtr(pObjPtr),
-   m_Client(nullptr),
-   m_Database(nullptr),
-   m_Collection(nullptr)
+   m_Pool(nullptr)
 {
    ensureMongoInit();
 }
@@ -203,16 +182,14 @@ CMongoDB::CMongoDB(qobjinst pObjPtr)
 // Copy constructor
 CMongoDB::CMongoDB(qobjinst pObjPtr, const CMongoDB *sourceObject)
    : m_ObjPtr(pObjPtr),
-   m_Client(nullptr),
-   m_Database(nullptr),
-   m_Collection(nullptr)
+   m_Pool(nullptr)
 {
    ensureMongoInit();
    setObject(pObjPtr, sourceObject);
 }
 
 // Copy the connection/query configuration (connection string, database, collection,
-// filters, dynamic filter, opts, aggregate pipeline).
+// filter, opts, aggregate pipeline).
 // The live connection handles are NOT copied; each instance manages its own connection.
 void CMongoDB::setObject(qobjinst pObjPtr, const CMongoDB *sourceObject)
 {
@@ -221,8 +198,7 @@ void CMongoDB::setObject(qobjinst pObjPtr, const CMongoDB *sourceObject)
    m_connectionString = sourceObject->m_connectionString;
    m_databaseName = sourceObject->m_databaseName;
    m_collectionName = sourceObject->m_collectionName;
-   m_filters = sourceObject->m_filters;
-   m_dynamicFilter = sourceObject->m_dynamicFilter;
+   m_filter = sourceObject->m_filter;
    m_opts = sourceObject->m_opts;
    m_aggregatePipeline = sourceObject->m_aggregatePipeline;
 }
@@ -233,20 +209,24 @@ CMongoDB::~CMongoDB()
    releaseHandles();
 }
 
-// Release all live mongoc handles in the correct order.
+// Release the mongoc client pool, if any.
+// Must not be called while a client checked out via acquireClient() is still
+// outstanding (find()/aggregate() always pop/push within the same call).
+// mongoc_client_pool_destroy() joins the monitoring threads, and a monitor stuck
+// connecting to an unreachable member (e.g. an arbiter advertised by the replica
+// set but firewalled from the client) blocks it for up to connectTimeoutMS (10s).
+// The pool is therefore destroyed on a detached thread so Omnis does not wait.
 void CMongoDB::releaseHandles()
 {
-   if (m_Collection) {
-      mongoc_collection_destroy(m_Collection);
-      m_Collection = nullptr;
-   }
-   if (m_Database) {
-      mongoc_database_destroy(m_Database);
-      m_Database = nullptr;
-   }
-   if (m_Client) {
-      mongoc_client_destroy(m_Client);
-      m_Client = nullptr;
+   if (m_Pool) {
+      mongoc_client_pool_t *pool = m_Pool;
+      m_Pool = nullptr;
+      try {
+         std::thread([pool]() { mongoc_client_pool_destroy(pool); }).detach();
+      }
+      catch (const std::system_error &) {
+         mongoc_client_pool_destroy(pool);
+      }
    }
 }
 
@@ -277,17 +257,8 @@ qbool CMongoDB::methodCall(EXTCompInfo *pEci)
    case cFindFunction:
       rtnCode = find(pEci);
       break;
-   case cAddFilterFunction:
-      rtnCode = addFilter(pEci);
-      break;
-   case cAddInFilterFunction:
-      rtnCode = addInFilter(pEci);
-      break;
-   case cSetDynamicFilterFunction:
-      rtnCode = setDynamicFilter(pEci);
-      break;
-   case cClearFiltersFunction:
-      rtnCode = clearFilters(pEci);
+   case cSetFilterFunction:
+      rtnCode = setFilter(pEci);
       break;
    case cSetOptsFunction:
       rtnCode = setOpts(pEci);
@@ -297,9 +268,6 @@ qbool CMongoDB::methodCall(EXTCompInfo *pEci)
       break;
    case cAggregateFunction:
       rtnCode = aggregate(pEci);
-      break;
-   case cClearAggregateFunction:
-      rtnCode = clearAggregate(pEci);
       break;
    }
 
@@ -349,11 +317,10 @@ qbool CMongoDB::setCollection(EXTCompInfo *pEci)
    return qtrue;
 }
 
-// Setter for dynamic filter (raw JSON).
-// This is added as-is to the filter document, so the user can use it for complex queries that are not possible with the simple addFilter method.
-qbool CMongoDB::setDynamicFilter(EXTCompInfo *pEci)
+// Setter for the filter (raw JSON) — the only way to filter find() results.
+qbool CMongoDB::setFilter(EXTCompInfo *pEci)
 {
-   if (!getStringFromEXTCompInfo(pEci, 1, m_dynamicFilter)) {
+   if (!getStringFromEXTCompInfo(pEci, 1, m_filter)) {
       m_errorMessage = "Incorrect number of parameters.";
       return qfalse;
    }
@@ -380,111 +347,7 @@ qbool CMongoDB::setAggregate(EXTCompInfo *pEci)
    return qtrue;
 }
 
-// Add a filter item to the list of filters to apply on find.
-qbool CMongoDB::addFilter(EXTCompInfo *pEci)
-{
-   std::string fieldName;
-   if (!getStringFromEXTCompInfo(pEci, 1, fieldName)) {
-      m_errorMessage = "Incorrect number of parameters.";
-      return qfalse;
-   }
-
-   int oper = 0;
-   if (!getIntFromEXTCompInfo(pEci, 2, oper)) {
-      m_errorMessage = "Incorrect number of parameters.";
-      return qfalse;
-   }
-   if (oper < 0 || oper >= static_cast<int>(foCOUNT)) {
-      m_errorMessage = "Invalid operator.";
-      return qfalse;
-   }
-
-   std::string fieldValue;
-   if (!getStringFromEXTCompInfo(pEci, 3, fieldValue)) {
-      m_errorMessage = "Incorrect number of parameters.";
-      return qfalse;
-   }
-
-   int type = 0;
-   if (!getIntFromEXTCompInfo(pEci, 4, type)) {
-      m_errorMessage = "Incorrect number of parameters.";
-      return qfalse;
-   }
-   if (type < 0 || type >= static_cast<int>(dtCOUNT)) {
-      m_errorMessage = "Invalid data type.";
-      return qfalse;
-   }
-
-   m_filters.push_back(FilterItem{ fieldName, fieldValue, static_cast<FilterOperators>(oper), static_cast<DataTypes>(type) });
-   return qtrue;
-}
-
-// Clear all filters from the list and also the dynamic filter.
-qbool CMongoDB::clearFilters(EXTCompInfo *)
-{
-   m_filters.clear();
-   m_dynamicFilter.clear();
-   return qtrue;
-}
-
-// Clear the aggregation pipeline set via setAggregate().
-qbool CMongoDB::clearAggregate(EXTCompInfo *)
-{
-   m_aggregatePipeline.clear();
-   return qtrue;
-}
-
-// Add an IN / NOT_IN filter.
-qbool CMongoDB::addInFilter(EXTCompInfo *pEci)
-{
-   std::string fieldName;
-   if (!getStringFromEXTCompInfo(pEci, 1, fieldName)) {
-      m_errorMessage = "Missing fieldName parameter.";
-      return qfalse;
-   }
-
-   int oper = 0;
-   if (!getIntFromEXTCompInfo(pEci, 2, oper)) {
-      m_errorMessage = "Missing operator parameter.";
-      return qfalse;
-   }
-   if (oper != foIN && oper != foNOT_IN) {
-      m_errorMessage = "Operator must be IN or NOT_IN.";
-      return qfalse;
-   }
-
-   std::unique_ptr<EXTqlist> omnisList(getListFromEXTCompInfo(pEci, 3, false));
-   if (!omnisList) {
-      m_errorMessage = "It was not possible to access the parameter number 4 or it is not a list.";
-      return qfalse;
-   }
-   if (omnisList->colCnt() == 0) {
-      m_errorMessage = "The values list must have, at least, one column.";
-      return qfalse;
-   }
-
-   std::vector<std::string> values;
-   for (qlong row = 1; row <= omnisList->rowCnt(); ++row) {
-      std::string value;
-      getStringFromEXTqlist(row, 1, omnisList.get(), value);
-      values.push_back(std::move(value));
-   }
-
-   int type = 0;
-   if (!getIntFromEXTCompInfo(pEci, 4, type)) {
-      m_errorMessage = "Missing data type parameter.";
-      return qfalse;
-   }
-   if (type < 0 || type >= static_cast<int>(dtCOUNT)) {
-      m_errorMessage = "Invalid data type.";
-      return qfalse;
-   }
-
-   m_filters.push_back(FilterItem{ fieldName, values, static_cast<FilterOperators>(oper), static_cast<DataTypes>(type) });
-   return qtrue;
-}
-
-// Execute a find query with the current filters and return the results in the provided EXTqlist.
+// Execute a find query using the filter and return the results in the provided EXTqlist.
 qbool CMongoDB::find(EXTCompInfo *pEci)
 {
    if (!validateFind())
@@ -496,14 +359,20 @@ qbool CMongoDB::find(EXTCompInfo *pEci)
       return qfalse;
    }
 
-   if (!openCollection())
+   mongoc_client_t *client = acquireClient();
+   if (!client)
       return qfalse;
+
+   mongoc_collection_t *collection =
+      mongoc_client_get_collection(client, m_databaseName.c_str(), m_collectionName.c_str());
 
    retList->clear(listVlen);
    addRowColToEXTqlist(retList.get(), "Documents");
 
    bson_t *filter = buildFilter();
    if (!filter) {
+      mongoc_collection_destroy(collection);
+      releaseClient(client);
       return qfalse;
    }
 
@@ -514,17 +383,24 @@ qbool CMongoDB::find(EXTCompInfo *pEci)
       if (!opts) {
          m_errorMessage = std::string("Invalid opts JSON: ") + optsErr.message;
          bson_destroy(filter);
+         mongoc_collection_destroy(collection);
+         releaseClient(client);
          return qfalse;
       }
    }
 
-   mongoc_cursor_t *cursor = mongoc_collection_find_with_opts(m_Collection, filter, opts, nullptr);
+   mongoc_cursor_t *cursor = mongoc_collection_find_with_opts(collection, filter, opts, nullptr);
    bson_destroy(filter);
    if (opts) {
       bson_destroy(opts);
    }
 
-   if (!fetchCursorResults(cursor, retList.get()))
+   const bool ok = fetchCursorResults(cursor, retList.get());
+
+   mongoc_collection_destroy(collection);
+   releaseClient(client);
+
+   if (!ok)
       return qfalse;
 
    ECOsetParameterChanged(pEci, 1);
@@ -543,21 +419,32 @@ qbool CMongoDB::aggregate(EXTCompInfo *pEci)
       return qfalse;
    }
 
-   if (!openCollection())
+   mongoc_client_t *client = acquireClient();
+   if (!client)
       return qfalse;
+
+   mongoc_collection_t *collection =
+      mongoc_client_get_collection(client, m_databaseName.c_str(), m_collectionName.c_str());
 
    retList->clear(listVlen);
    addRowColToEXTqlist(retList.get(), "Documents");
 
    bson_t *pipeline = buildAggregatePipeline();
    if (!pipeline) {
+      mongoc_collection_destroy(collection);
+      releaseClient(client);
       return qfalse;
    }
 
-   mongoc_cursor_t *cursor = mongoc_collection_aggregate(m_Collection, MONGOC_QUERY_NONE, pipeline, nullptr, nullptr);
+   mongoc_cursor_t *cursor = mongoc_collection_aggregate(collection, MONGOC_QUERY_NONE, pipeline, nullptr, nullptr);
    bson_destroy(pipeline);
 
-   if (!fetchCursorResults(cursor, retList.get()))
+   const bool ok = fetchCursorResults(cursor, retList.get());
+
+   mongoc_collection_destroy(collection);
+   releaseClient(client);
+
+   if (!ok)
       return qfalse;
 
    ECOsetParameterChanged(pEci, 1);
@@ -595,53 +482,57 @@ bool CMongoDB::fetchCursorResults(mongoc_cursor_t *cursor, EXTqlist *retList)
 // Internal helper methods for building filters and executing queries
 //
 
-// Open (or reuse) the mongoc_client -> database -> collection chain.
-// Returns false and sets errorMessage on failure.
-bool CMongoDB::openCollection()
+// Lazily create the mongoc client pool for the current connection string.
+// Using a pool (rather than a plain mongoc_client_t) means replica-set
+// server discovery happens in background monitoring threads that watch all
+// seed hosts concurrently, so a single unreachable/slow seed no longer
+// blocks every operation for its full connectTimeoutMS.
+// Returns false and sets m_errorMessage on failure.
+bool CMongoDB::ensurePool()
 {
-   // Reuse existing client if already open.
-   if (!m_Client) {
-      bson_error_t err;
-      mongoc_uri_t *uri = mongoc_uri_new_with_error(m_connectionString.c_str(), &err);
-      if (!uri) {
-         m_errorMessage = std::string("Invalid URI: ") + err.message;
-         return false;
-      }
+   if (m_Pool)
+      return true;
 
-      m_Client = mongoc_client_new_from_uri(uri);
-      mongoc_uri_destroy(uri);
-      if (!m_Client) {
-         m_errorMessage = "Failed to create mongoc client.";
-         return false;
-      }
-      // Optional: set a server-selection timeout (5 s) so errors are fast.
-      mongoc_client_set_appname(m_Client, "MCWMongoDB");
+   bson_error_t err;
+   mongoc_uri_t *uri = mongoc_uri_new_with_error(m_connectionString.c_str(), &err);
+   if (!uri) {
+      m_errorMessage = std::string("Invalid URI: ") + err.message;
+      return false;
    }
 
-   // Re-create database / collection handles if the names changed.
-   if (!m_Database || mongoc_database_get_name(m_Database) != m_databaseName) {
-      if (m_Collection) {
-         mongoc_collection_destroy(m_Collection);
-         m_Collection = nullptr;
-      }
-      if (m_Database) {
-         mongoc_database_destroy(m_Database);
-         m_Database = nullptr;
-      }
-      m_Database = mongoc_client_get_database(m_Client, m_databaseName.c_str());
+   m_Pool = mongoc_client_pool_new_with_error(uri, &err);
+   mongoc_uri_destroy(uri);
+
+   if (!m_Pool) {
+      m_errorMessage = std::string("Failed to create mongoc client pool: ") + err.message;
+      return false;
    }
 
-   // Re-create the collection handle if the collection name changed.
-   if (m_Collection && mongoc_collection_get_name(m_Collection) != m_collectionName) {
-      mongoc_collection_destroy(m_Collection);
-      m_Collection = nullptr;
-   }
-
-   if (!m_Collection) {
-      m_Collection = mongoc_database_get_collection(m_Database, m_collectionName.c_str());
-   }
-
+   mongoc_client_pool_set_appname(m_Pool, "MCWMongoDB");
    return true;
+}
+
+// Check out a client from the pool (creating the pool if needed).
+// Caller must pass the returned client to releaseClient() when done.
+// Returns nullptr and sets m_errorMessage on failure.
+mongoc_client_t *CMongoDB::acquireClient()
+{
+   if (!ensurePool())
+      return nullptr;
+
+   mongoc_client_t *client = mongoc_client_pool_pop(m_Pool);
+   if (!client) {
+      m_errorMessage = "Failed to acquire a Mongo client from the pool.";
+   }
+   return client;
+}
+
+// Return a client acquired via acquireClient() to the pool.
+void CMongoDB::releaseClient(mongoc_client_t *client)
+{
+   if (client && m_Pool) {
+      mongoc_client_pool_push(m_Pool, client);
+   }
 }
 
 // Validate that the connection string, database and collection are all set.
@@ -663,7 +554,7 @@ bool CMongoDB::validateConnectionParams()
    return true;
 }
 
-// Check raw user-supplied JSON (dynamic filter / aggregate pipeline) for operators
+// Check raw user-supplied JSON (filter / aggregate pipeline) for operators
 // that allow arbitrary code execution or writes ($where/$function/$accumulator/$merge/$out).
 bool CMongoDB::containsForbiddenOperator(const std::string &json, std::string &outOp)
 {
@@ -687,8 +578,8 @@ bool CMongoDB::validateFind()
       return false;
 
    std::string forbiddenOp;
-   if (containsForbiddenOperator(m_dynamicFilter, forbiddenOp)) {
-      m_errorMessage = "Dynamic filter contains invalid operator (" + forbiddenOp + ")";
+   if (containsForbiddenOperator(m_filter, forbiddenOp)) {
+      m_errorMessage = "Filter contains invalid operator (" + forbiddenOp + ")";
       return false;
    }
    return true;
@@ -727,212 +618,21 @@ bson_t *CMongoDB::buildAggregatePipeline()
    return doc;
 }
 
-// Build the complete filter document.
+// Build the filter document from the filter (raw JSON), if present.
 // Returns a heap-allocated bson_t; caller must bson_destroy() it.
 bson_t *CMongoDB::buildFilter()
 {
-   std::vector<bson_t *> items;
-
-   for (const FilterItem &itm : m_filters) {
-      bson_t *item = bson_new();
-      bool success = false;
-      if (itm.oper == foIN || itm.oper == foNOT_IN) {
-         success = buildInFilterItem(item, itm.fieldName, itm.oper, itm.values, itm.type);
-      }
-      else {
-         success = buildFilterItem(item, itm.fieldName, itm.oper, itm.value, itm.type);
-      }
-
-      if (!success) {
-         for (bson_t *b : items)
-            bson_destroy(b);
-
-         return nullptr;
-      }
-
-      items.push_back(item);
-   }
-
-   // Add the dynamic filter (raw JSON) if present.
-   bson_t *dynDoc = nullptr;
-   if (!m_dynamicFilter.empty()) {
-      bson_error_t err{};
-      dynDoc = bson_new_from_json(reinterpret_cast<const uint8_t *>(m_dynamicFilter.c_str()), static_cast<ssize_t>(m_dynamicFilter.size()), &err);
-      if (dynDoc) {
-         items.push_back(dynDoc);
-      }
-      else {
-         m_errorMessage = std::string("Invalid dynamic filter JSON: ") + err.message;
-         for (bson_t *b : items)
-            bson_destroy(b);
-         return nullptr;
-      }
-   }
-
-   // No filters -> return empty document.
-   if (items.empty()) {
+   if (m_filter.empty()) {
       return bson_new();
    }
 
-   // Single filter -> return it directly (no $and wrapper needed).
-   if (items.size() == 1) {
-      bson_t *result = bson_copy(items[0]);
-      for (bson_t *b : items)
-         bson_destroy(b);
-
-      return result;
+   bson_error_t err{};
+   bson_t *doc = bson_new_from_json(reinterpret_cast<const uint8_t *>(m_filter.c_str()), static_cast<ssize_t>(m_filter.size()), &err);
+   if (!doc) {
+      m_errorMessage = std::string("Invalid filter JSON: ") + err.message;
+      return nullptr;
    }
-
-   // Multiple filters -> wrap in { $and: [ ... ] }.
-   bson_t *finalFilter = bson_new();
-   bson_t andArray = BSON_INITIALIZER;
-   BSON_APPEND_ARRAY_BEGIN(finalFilter, "$and", &andArray);
-
-   char keyBuf[16];
-   uint32_t idx = 0;
-   for (bson_t *item : items) {
-      const char *key;
-      bson_uint32_to_string(idx++, &key, keyBuf, sizeof(keyBuf));
-      BSON_APPEND_DOCUMENT(&andArray, key, item);
-   }
-
-   bson_append_array_end(finalFilter, &andArray);
-
-   for (bson_t *b : items)
-      bson_destroy(b);
-
-   return finalFilter;
-}
-
-// Append a single field comparison to dest.
-// dest must already be initialised by the caller (bson_new() or similar).
-bool CMongoDB::buildFilterItem(bson_t *dest, const std::string &fieldName, FilterOperators filterOperator, const std::string &value, DataTypes type)
-{
-   const char *field = fieldName.c_str();
-
-   if (filterOperator == foEQUAL) {
-      // { field: <value> }
-      return appendBsonValue(dest, fieldName, value, type);
-   }
-
-   // All other operators: { field: { $op: <value> } }
-   const char *opStr = nullptr;
-   switch (filterOperator) {
-   case foNOT_EQUAL:
-      opStr = "$ne";
-      break;
-   case foGREATER:
-      opStr = "$gt";
-      break;
-   case foGREATER_OR_EQUAL:
-      opStr = "$gte";
-      break;
-   case foLESSER:
-      opStr = "$lt";
-      break;
-   case foLESSER_OR_EQUAL:
-      opStr = "$lte";
-      break;
-   default:
-      m_errorMessage = std::string("Unsupported operator: ") + std::to_string(filterOperator);
-      return false;
-   }
-
-   bson_t opDoc = BSON_INITIALIZER;
-   BSON_APPEND_DOCUMENT_BEGIN(dest, field, &opDoc);
-   if (!appendBsonValue(&opDoc, opStr, value, type)) {
-      return false;
-   }
-
-   bson_append_document_end(dest, &opDoc);
-   return true;
-}
-
-// Build a { field: { $in: [v1, v2, ...] } } or $nin document.
-// Dest must be an already-initialised bson_t (bson_new()).
-bool CMongoDB::buildInFilterItem(bson_t *dest, const std::string &fieldName, FilterOperators filterOperator, const std::vector<std::string> &values, DataTypes type)
-{
-   const char *opStr = (filterOperator == foIN) ? "$in" : "$nin";
-
-   // Build the values array first.
-   bson_t valArray = BSON_INITIALIZER;
-   bson_t opDoc = BSON_INITIALIZER;
-
-   BSON_APPEND_DOCUMENT_BEGIN(dest, fieldName.c_str(), &opDoc);
-   BSON_APPEND_ARRAY_BEGIN(&opDoc, opStr, &valArray);
-
-   char keyBuf[16];
-   uint32_t idx = 0;
-   for (const std::string &val : values) {
-      const char *key;
-      bson_uint32_to_string(idx++, &key, keyBuf, sizeof(keyBuf));
-      if (!appendBsonValue(&valArray, key, val, type))
-         return false;
-   }
-
-   bson_append_array_end(&opDoc, &valArray);
-   bson_append_document_end(dest, &opDoc);
-   return true;
-}
-
-// Append a typed value to a BSON document under the given key.
-bool CMongoDB::appendBsonValue(bson_t *doc, const std::string &key, const std::string &value, DataTypes type)
-{
-   const char *k = key.c_str();
-
-   switch (type) {
-   case dtCHARACTER:
-      BSON_APPEND_UTF8(doc, k, value.c_str());
-      break;
-   case dtINTEGER_32:
-      try {
-         BSON_APPEND_INT32(doc, k, static_cast<int32_t>(std::stoi(value)));
-      }
-      catch (const std::exception &) {
-         m_errorMessage = "Invalid 32-bit integer value for field '" + key + "': " + value;
-         return false;
-      }
-      break;
-   case dtINTEGER_64:
-      try {
-         BSON_APPEND_INT64(doc, k, static_cast<int64_t>(std::stoll(value)));
-      }
-      catch (const std::exception &) {
-         m_errorMessage = "Invalid 64-bit integer value for field '" + key + "': " + value;
-         return false;
-      }
-      break;
-   case dtDOUBLE:
-      try {
-         BSON_APPEND_DOUBLE(doc, k, std::stod(value));
-      }
-      catch (const std::exception &) {
-         m_errorMessage = "Invalid floating point value for field '" + key + "': " + value;
-         return false;
-      }
-      break;
-   case dtBOOLEAN:
-      BSON_APPEND_BOOL(doc, k, value == "true" || value == "1");
-      break;
-   case dtNULL:
-      BSON_APPEND_NULL(doc, k);
-      break;
-   case dtDATE_TIME: {
-      int64_t ms;
-      if (!iso8601ToMilliseconds(value, ms)) {
-         return false;
-      }
-
-      BSON_APPEND_DATE_TIME(doc, k, ms);
-      break;
-   }
-
-   default:
-      m_errorMessage = std::string("Unsupported DataType: ") + std::to_string(type);
-      return false;
-   }
-
-   return true;
+   return doc;
 }
 
 // Fill the provided EXTqlist with the fields from the given BSON document.
@@ -1153,54 +853,4 @@ DataTypes CMongoDB::getElementType(const bson_iter_t &iter)
    default:
       return dtCHARACTER;
    }
-}
-
-// Parse an ISO8601 date string and convert it to milliseconds since the Unix epoch.
-bool CMongoDB::iso8601ToMilliseconds(const std::string &dateTimeIso8601, int64_t &retMs)
-{
-   std::tm tm{};
-   int milliseconds = 0;
-   char tzSign = 'Z';
-   int tzHour = 0;
-   int tzMin = 0;
-
-   // Try with milliseconds and timezone offset.
-   int parsed = sscanf_s(
-      dateTimeIso8601.c_str(),
-      "%4d-%2d-%2dT%2d:%2d:%2d.%3d%c%2d:%2d",
-      &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &milliseconds, &tzSign, 1, &tzHour, &tzMin);
-
-   if (parsed < 7) {
-      // Try without milliseconds.
-      parsed = sscanf_s(
-         dateTimeIso8601.c_str(),
-         "%4d-%2d-%2dT%2d:%2d:%2d%c%2d:%2d",
-         &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &tzSign, 1, &tzHour, &tzMin);
-   }
-
-   if (parsed < 6) {
-      m_errorMessage = "Invalid ISO8601 date: " + dateTimeIso8601;
-      return false;
-   }
-
-   tm.tm_year -= 1900;
-   tm.tm_mon -= 1;
-   tm.tm_isdst = 0;
-
-   std::time_t utcTime = _mkgmtime(&tm);
-   if (utcTime == -1) {
-      m_errorMessage = "Failed to convert date: " + dateTimeIso8601;
-      return false;
-   }
-
-   // Apply timezone offset.
-   int64_t offsetSeconds = 0;
-   if (tzSign == '+' || tzSign == '-') {
-      offsetSeconds = tzHour * 3600LL + tzMin * 60LL;
-      if (tzSign == '-') offsetSeconds = -offsetSeconds;
-   }
-
-   utcTime -= static_cast<std::time_t>(offsetSeconds);
-   retMs = static_cast<int64_t>(utcTime) * 1000LL + milliseconds;
-   return true;
 }

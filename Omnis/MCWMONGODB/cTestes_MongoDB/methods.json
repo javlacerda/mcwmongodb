@@ -1,36 +1,6 @@
 [
 	{
-		"name": "Test_Find_With_Filters",
-		"order": 1,
-		"pvardefs": [
-
-		],
-		"lvardefs": [
-			{
-				"name": "lvbOk",
-				"order": 3,
-				"type": "kBoolean",
-				"subtype": 0,
-				"sublen": 0
-			},
-			{
-				"name": "lvLstRegs",
-				"order": 2,
-				"type": "kList",
-				"subtype": "",
-				"sublen": 0
-			},
-			{
-				"name": "lvoMongoDB",
-				"order": 1,
-				"type": "kObject",
-				"subtype": ".MCWMongoDB.MCWMongoDB",
-				"sublen": 0
-			}
-		]
-	},
-	{
-		"name": "Test_Find_With_Dynamic_Filters",
+		"name": "Teste_Find",
 		"order": 2,
 		"pvardefs": [
 
@@ -38,28 +8,35 @@
 		"lvardefs": [
 			{
 				"name": "lvbOk",
-				"order": 5,
+				"order": 2,
 				"type": "kBoolean",
 				"subtype": 0,
 				"sublen": 0
 			},
 			{
-				"name": "lvcOpts",
-				"order": 3,
+				"name": "lvcErrorMsg",
+				"order": 4,
 				"type": "kCharacter",
 				"subtype": "kSimplechar",
 				"sublen": 100000000
 			},
 			{
 				"name": "lvcQuery",
-				"order": 2,
+				"order": 6,
 				"type": "kCharacter",
 				"subtype": "kSimplechar",
 				"sublen": 100000000
 			},
 			{
+				"name": "lvLstDetails",
+				"order": 5,
+				"type": "kList",
+				"subtype": "",
+				"sublen": 0
+			},
+			{
 				"name": "lvLstRegs",
-				"order": 4,
+				"order": 3,
 				"type": "kList",
 				"subtype": "",
 				"sublen": 0
@@ -74,7 +51,7 @@
 		]
 	},
 	{
-		"name": "Test_Aggregates",
+		"name": "Teste_Find_With_Opts",
 		"order": 3,
 		"pvardefs": [
 
@@ -82,21 +59,42 @@
 		"lvardefs": [
 			{
 				"name": "lvbOk",
-				"order": 4,
+				"order": 3,
 				"type": "kBoolean",
 				"subtype": 0,
 				"sublen": 0
 			},
 			{
-				"name": "lvcAggregate",
-				"order": 2,
+				"name": "lvcErrorMsg",
+				"order": 6,
 				"type": "kCharacter",
 				"subtype": "kSimplechar",
 				"sublen": 100000000
 			},
 			{
+				"name": "lvcOpts",
+				"order": 5,
+				"type": "kCharacter",
+				"subtype": "kSimplechar",
+				"sublen": 100000000
+			},
+			{
+				"name": "lvcQuery",
+				"order": 4,
+				"type": "kCharacter",
+				"subtype": "kSimplechar",
+				"sublen": 100000000
+			},
+			{
+				"name": "lvLstDetails",
+				"order": 7,
+				"type": "kList",
+				"subtype": "",
+				"sublen": 0
+			},
+			{
 				"name": "lvLstRegs",
-				"order": 3,
+				"order": 2,
 				"type": "kList",
 				"subtype": "",
 				"sublen": 0
@@ -106,6 +104,71 @@
 				"order": 1,
 				"type": "kObject",
 				"subtype": ".MCWMongoDB.MCWMongoDB",
+				"sublen": 0
+			}
+		]
+	},
+	{
+		"name": "Teste_Aggregate",
+		"order": 4,
+		"pvardefs": [
+
+		],
+		"lvardefs": [
+			{
+				"name": "lvbOk",
+				"order": 3,
+				"type": "kBoolean",
+				"subtype": 0,
+				"sublen": 0
+			},
+			{
+				"name": "lvcAggregate",
+				"order": 5,
+				"type": "kCharacter",
+				"subtype": "kSimplechar",
+				"sublen": 100000000
+			},
+			{
+				"name": "lvcErrorMsg",
+				"order": 6,
+				"type": "kCharacter",
+				"subtype": "kSimplechar",
+				"sublen": 100000000
+			},
+			{
+				"name": "lvcQuery",
+				"order": 4,
+				"type": "kCharacter",
+				"subtype": "kSimplechar",
+				"sublen": 100000000
+			},
+			{
+				"name": "lvLstDetails",
+				"order": 7,
+				"type": "kList",
+				"subtype": "",
+				"sublen": 0
+			},
+			{
+				"name": "lvLstRegs",
+				"order": 2,
+				"type": "kList",
+				"subtype": "",
+				"sublen": 0
+			},
+			{
+				"name": "lvoMongoDB",
+				"order": 1,
+				"type": "kObject",
+				"subtype": ".MCWMongoDB.MCWMongoDB",
+				"sublen": 0
+			},
+			{
+				"name": "lvRefRow",
+				"order": 8,
+				"type": "kItemref",
+				"subtype": "",
 				"sublen": 0
 			}
 		]

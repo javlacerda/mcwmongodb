@@ -1,0 +1,37 @@
+# Exemplo de utilização do $find usando filtros.
+# Devolve todos os campos dos documentos. O campo details, por ser um array, é devolvido como uma estrutura json e terá que ser convertido numa list
+
+Do lvoMongoDB.$setconnectionstring(cvcConnectionString)
+Do lvoMongoDB.$setdatabase("erp")
+Do lvoMongoDB.$setcollection("erp_prz_com_e_log_trans")
+
+Begin text block
+Line:{
+Line:   "table": "E_Fac_Doc_Cab",
+Line:   "fieldId": "FDcb_Codigo",
+Line:   "valueId": "PRZ/104383144",
+Line:   "details.fieldChanged": "FDcb_Status"
+Line:}
+End text block
+Get text block lvcQuery
+Do lvoMongoDB.$setfilter(lvcQuery)
+
+Do lvoMongoDB.$find(lvLstRegs) Returns lvbOk
+If not(lvbOk)
+	Do $ctask.$showmessage(lvoMongoDB.$geterrormessage())
+	Quit method
+End If
+
+Do $ctask.$showmessage(con(lvLstRegs.$linecount," documentos devolvidos!"))
+
+For lvLstRegs.$line from 1 to lvLstRegs.$linecount step 1
+	Do OJSON.$jsontolistorrow(lvLstRegs.C1.details,lvcErrorMsg,kTrue) Returns lvLstDetails
+	
+	# A lvLstDetails terá todos os campos alterados em cada documento
+End For
+Breakpoint
+
+# NOTA:
+# NESTE MOMENTO O details ESTÁ A SER DEVOLVIDO COMO UMA STRING JSON
+# ESTOU A TRABALHAR NUMA NOVA VERSÃO PARA QUE OS DOCUMENTOS "NESTED" SEJAM DEVOLVIDOS COMO ROWS OU LISTS MAS AINDA VAI DEMRORAR ALGUM TEMPO
+# POR ISSO, PARA JÁ TEMOS QUE ASSUMIR QUE OS DOCUMENTOS "NESTED" VIRÃO SEMPRE COMO JSON

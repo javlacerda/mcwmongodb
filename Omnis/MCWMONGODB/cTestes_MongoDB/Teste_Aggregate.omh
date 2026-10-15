@@ -1,0 +1,58 @@
+# Exemplo de utilização do $aggregate.
+# Permite criar qualquer tipo de filtro e definir pipelines para tratamento dos documentos
+# Devolve apenas os campos createdOn, details.oldValue e details.newValue e apenas os registos de alterações do campo FDcb_Status
+# Muito mais poderoso mas mais complexo e exige alguns conhecimentos de queries MondoDB
+
+Do lvoMongoDB.$setconnectionstring(cvcConnectionString)
+Do lvoMongoDB.$setdatabase("erp")
+Do lvoMongoDB.$setcollection("erp_prz_com_e_log_trans")
+
+Begin text block
+Line:[
+Line:  {
+Line:    "$match": {
+Line:      "table": "E_Fac_Doc_Cab",
+Line:      "fieldId": "FDcb_Codigo",
+Line:      "valueId": "PRZ/104383144"
+Line:    }
+Line:  },
+Line:  {
+Line:    "$unwind": "$details"
+Line:  },
+Line:  {
+Line:    "$match": {
+Line:      "details.fieldChanged": "FDcb_Status"
+Line:    }
+Line:  },
+Line:  {
+Line:    "$project": {
+Line:      "_id": 0,
+Line:      "createdOn": "$createdOn",
+# Line:      "fieldChanged": "$details.fieldChanged",
+Line:      "oldValue": "$details.oldValue",
+Line:      "newValue": "$details.newValue"
+Line:    }
+Line:  }
+# Line:  {
+# Line:      "$limit":10
+# Line:  }
+Line:]
+End text block
+Get text block lvcAggregate
+
+Do lvoMongoDB.$setaggregate(lvcAggregate)
+
+Do lvoMongoDB.$aggregate(lvLstRegs) Returns lvbOk
+If not(lvbOk)
+	Do $ctask.$showmessage(lvoMongoDB.$geterrormessage())
+	Quit method
+End If
+
+Do $ctask.$showmessage(con(lvLstRegs.$linecount," documentos devolvidos!"))
+
+For lvLstRegs.$line from 1 to lvLstRegs.$linecount step 1
+	Set reference lvRefRow to lvLstRegs.C1
+	
+	# A lvRefRow terá os dados da mudança do FDcb_Status
+End For
+Breakpoint

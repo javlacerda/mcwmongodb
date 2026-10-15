@@ -9,9 +9,10 @@ It enables Omnis Studio applications to connect, query, and filter MongoDB colle
 
 - Connect to MongoDB using a connection string
 - Select database and collection
-- Query documents with filters
-- Support for dynamic MongoDB query expressions
-- Typed filtering (string, integer, boolean, datetime, etc.)
+- Query documents with filters and find options (sort, limit, projection) in MongoDB JSON syntax
+- Aggregation pipelines
+- Results returned as typed Omnis lists (string, integer, boolean, datetime, etc.)
+- Replica set support through a connection pool with background server monitoring
 - Error handling and diagnostics
 
 
@@ -20,12 +21,12 @@ It enables Omnis Studio applications to connect, query, and filter MongoDB colle
 - Omnis Studio
 - Visual Studio 2022
 - vcpkg
-- mongo-c-driver:x64-windows
+- mongo-c-driver:x64-windows-static
 
 Install dependency:
 
 ```
-vcpkg install mongo-c-driver:x64-windows
+vcpkg install mongo-c-driver:x64-windows-static
 ```
 
 

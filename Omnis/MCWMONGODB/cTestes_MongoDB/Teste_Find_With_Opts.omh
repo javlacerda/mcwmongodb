@@ -1,0 +1,47 @@
+# Exemplo de utilização do $find usando filtros dinâmicos e options.
+# Permite criar qualquer tipo de filtro e definir projections (orders, campos a devolver, etc.)
+# Na lvcOpts definimos que devolve apenas o campo details. Por ser um array, é devolvido como uma estrutura json e terá que ser convertido numa list
+
+Do lvoMongoDB.$setconnectionstring(cvcConnectionString)
+Do lvoMongoDB.$setdatabase("erp")
+Do lvoMongoDB.$setcollection("erp_prz_com_e_log_trans")
+
+Begin text block
+Line:{
+Line:   "table": "E_Fac_Doc_Cab",
+Line:   "fieldId": "FDcb_Codigo",
+Line:   "valueId": "PRZ/104383144",
+Line:   "details.fieldChanged": "FDcb_Status"
+Line:}
+End text block
+Get text block lvcQuery
+
+Do lvoMongoDB.$setfilter(lvcQuery)
+
+Begin text block
+Line:{
+Line:   "projection": {
+Line:      "_id": 0,
+Line:      "details": 1
+Line:   }
+Line:}
+End text block
+Get text block lvcOpts
+
+Do lvoMongoDB.$setopts(lvcOpts)
+
+Do lvoMongoDB.$find(lvLstRegs) Returns lvbOk
+If not(lvbOk)
+	Do $ctask.$showmessage(lvoMongoDB.$geterrormessage())
+	Quit method
+End If
+
+Do $ctask.$showmessage(con(lvLstRegs.$linecount," documentos devolvidos!"))
+
+For lvLstRegs.$line from 1 to lvLstRegs.$linecount step 1
+	Do OJSON.$jsontolistorrow(lvLstRegs.C1.details,lvcErrorMsg,kTrue) Returns lvLstDetails
+	
+	# A lvLstDetails terá todos os campos alterados em cada documento
+End For
+
+Breakpoint
